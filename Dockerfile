@@ -1,46 +1,49 @@
 FROM ubuntu:22.04
 
+# Zamezení interaktivním dotazům
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalace pouze nezbytných síťových nástrojů
+# 1. Instalace síťových nástrojů a závislostí
+# Instalujeme pouze nástroje pro běh, ne pro kompilaci (DKMS)
 RUN apt-get update && apt-get install -y \
     curl \
     openvpn \
     unzip \
-    wireguard \
+    wireguard-tools \
     iproute2 \
     ca-certificates \
     tinyproxy \
     iptables \
     && rm -rf /var/lib/apt/lists/*
 
-ARG CG_VERSION=1.3.4
-ARG DOWNLOAD_URL=https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-22.04-${CG_VERSION}.zip
+# 2. Kopírování tvého nahraného souboru z repozitáře
+# Ujisti se, že se soubor v repozitáři jmenuje přesně takto
+COPY cyberghostvpn-ubuntu-22.04-1.4.1.zip cg.zip
 
-RUN echo "Stahuji z: ${DOWNLOAD_URL}" && \
-    curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-         -H "Referer: https://www.cyberghostvpn.com/" \
-         "${DOWNLOAD_URL}" -o cg.zip && \
-    # Kontrola, zda stažený soubor není příliš malý (HTML error page)
-    if [ $(stat -c%s cg.zip) -lt 10000 ]; then echo "CHYBA: Stažený soubor je poškozený nebo zablokovaný!" && cat cg.zip && exit 1; fi && \
-    unzip cg.zip && \
+# 3. Manuální rozbalení a instalace binárky
+RUN unzip cg.zip && \
     cd cyberghostvpn-ubuntu-* && \
+    # Rozbalíme vnitřní archiv se soubory aplikace
     tar xzvf data.tar.gz && \
+    # Kopírování binárky do systému
     cp usr/bin/cyberghostvpn /usr/bin/ && \
+    # Vytvoření složek a kopírování certifikátů/šablon
     mkdir -p /etc/cyberghost /usr/local/share/cyberghost && \
     cp -r usr/local/share/cyberghost/* /usr/local/share/cyberghost/ && \
+    # Nastavení práv pro spuštění
     chmod +x /usr/bin/cyberghostvpn && \
-    cd .. && rm -rf cg.zip cyberghostvpn-ubuntu-*
+    # Úklid
+    cd .. && rm -rf cg.zip cyberghostvpn-ubuntu-24.04-1.4.1
 
-# Ověření, že binárka funguje (vypíše verzi)
-RUN cyberghostvpn --version || true
+# 4. Konfigurace Tinyproxy (povolení přístupu zvenčí)
+RUN sed -i 's/^Allow /#Allow /' /etc/tinyproxy/tinyproxy.conf && \
+    echo "Allow 0.0.0.0/0" >> /etc/tinyproxy/tinyproxy.conf
 
-# Konfigurace Tinyproxy
-RUN sed -i 's/^Allow /#Allow /' /etc/tinyproxy/tinyproxy.conf \
-    && echo "Allow 0.0.0.0/0" >> /etc/tinyproxy/tinyproxy.conf
-
+# 5. Nastavení spouštěcího skriptu
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Porty: 8888 (Proxy), 51820 (WireGuard server)
 EXPOSE 8888 51820/udp
+
 ENTRYPOINT ["/entrypoint.sh"]
