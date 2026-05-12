@@ -1,0 +1,46 @@
+name: Auto-Build CyberGhost
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Kontrola každých 6 hodin
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Version URL
+        id: get_ver
+        run: |
+          URL=$(curl -s https://www.cyberghostvpn.com/en_US/vpn-for-linux | grep -oP 'https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-[0-9.]+-1.*?.zip' | head -n 1)
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "hash=${{ hashFiles('Dockerfile', 'entrypoint.sh') }}-$URL" >> $GITHUB_OUTPUT
+
+      - name: Cache Check
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: version.txt
+          key: ${{ steps.get_ver.outputs.hash }}
+
+      - name: Build and Push
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/cyberghost-proxy:latest
+          build-args: DOWNLOAD_URL=${{ steps.get_ver.outputs.url }}
+          
+      - name: Update Cache Tag
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo ${{ steps.get_ver.outputs.url }} > version.txt
