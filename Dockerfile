@@ -1,9 +1,8 @@
 FROM ubuntu:22.04
 
-# Nastavení non-interactive módu pro apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Instalace kritických prvků pro instalátor CyberGhost (sudo, lsb-release) + zbytek
+# Instalace závislostí včetně lsb-release a sudo (nutné pro install.sh)
 RUN apt-get update && apt-get install -y \
     curl \
     openvpn \
@@ -17,22 +16,24 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
-# Definice verze
 ARG CG_VERSION=1.3.4
 ARG DOWNLOAD_URL=https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-22.04-${CG_VERSION}.zip
 
-# 2. Stažení a OPRAVENÁ instalace
-# CyberGhost skript kontroluje, zda běží pod sudo. V Dockeru jsme root, 
-# tak mu vytvoříme falešné sudo, pokud by ho vyžadoval.
 RUN echo "Stahuji z: ${DOWNLOAD_URL}" && \
     curl -L "${DOWNLOAD_URL}" -o cg.zip && \
     unzip cg.zip && \
     cd cyberghostvpn-ubuntu-* && \
-    # Spustíme instalaci a odpovíme 'Y' na všechna potvrzení
-    printf "y\ny\n" | bash install.sh && \
+    # KLÍČOVÉ ÚPRAVY:
+    # 1. Vytvoříme prázdný soubor, aby si skript myslel, že systemd existuje
+    touch /bin/systemctl && chmod +x /bin/systemctl && \
+    # 2. Spustíme instalátor, potvrdíme vstupy a ignorujeme exit code (|| true)
+    #    Instalátor často hodí chybu na konci, i když binárku už nainstaloval.
+    printf "y\ny\n" | bash install.sh || true && \
+    # 3. Kontrola, zda binárka skutečně existuje (pokud ne, build selže tady)
+    ls /usr/bin/cyberghostvpn && \
     cd .. && rm -rf cg.zip cyberghostvpn-ubuntu-*
 
-# 3. Konfigurace Tinyproxy
+# Konfigurace Tinyproxy
 RUN sed -i 's/^Allow /#Allow /' /etc/tinyproxy/tinyproxy.conf \
     && echo "Allow 0.0.0.0/0" >> /etc/tinyproxy/tinyproxy.conf
 
