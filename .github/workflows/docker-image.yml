@@ -18,6 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Tato proměnná teď bude mít právo zápisu
+
       - name: Get Version URL
         id: get_ver
         run: |
