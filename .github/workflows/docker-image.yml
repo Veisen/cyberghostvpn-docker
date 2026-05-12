@@ -38,7 +38,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/cyberghost-proxy:latest
+          tags: ghcr.io/veisen/cyberghostvpn-docker/cyberghost-proxy:latest
           build-args: DOWNLOAD_URL=${{ steps.get_ver.outputs.url }}
           
       - name: Update Cache Tag
