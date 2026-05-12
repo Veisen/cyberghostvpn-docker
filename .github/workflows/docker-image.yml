@@ -21,7 +21,17 @@ jobs:
       - name: Get Version URL
         id: get_ver
         run: |
-          URL=$(curl -s https://www.cyberghostvpn.com/en_US/vpn-for-linux | grep -oP 'https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-[0-9.]+-1.*?.zip' | head -n 1)
+          # Pokud parsování selže, použijeme 1.3.4 jako základ
+          DEFAULT_VER="1.3.4"
+          
+          # Zkusíme získat URL s lepším User-Agentem, aby nás CyberGhost neblokoval
+          URL=$(curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" https://www.cyberghostvpn.com/en_US/vpn-for-linux | grep -oE 'https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-[0-9.]+-1[a-zA-Z0-9.-]*\.zip' | head -n 1)
+          
+          if [ -z "$URL" ]; then
+            echo "Web nás zablokoval nebo změnil strukturu. Používám default verzi $DEFAULT_VER"
+            URL="https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-22.04-${DEFAULT_VER}.zip"
+          fi
+          
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "hash=${{ hashFiles('Dockerfile', 'entrypoint.sh') }}-$URL" >> $GITHUB_OUTPUT
 
