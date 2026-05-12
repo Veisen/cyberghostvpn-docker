@@ -18,18 +18,17 @@ ARG CG_VERSION=1.3.4
 ARG DOWNLOAD_URL=https://download.cyberghostvpn.com/linux/cyberghostvpn-ubuntu-22.04-${CG_VERSION}.zip
 
 RUN echo "Stahuji z: ${DOWNLOAD_URL}" && \
-    curl -L "${DOWNLOAD_URL}" -o cg.zip && \
+    curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+         -H "Referer: https://www.cyberghostvpn.com/" \
+         "${DOWNLOAD_URL}" -o cg.zip && \
+    # Kontrola, zda stažený soubor není příliš malý (HTML error page)
+    if [ $(stat -c%s cg.zip) -lt 10000 ]; then echo "CHYBA: Stažený soubor je poškozený nebo zablokovaný!" && cat cg.zip && exit 1; fi && \
     unzip cg.zip && \
     cd cyberghostvpn-ubuntu-* && \
-    # MANUÁLNÍ INSTALACE (to, co dělá skript uvnitř):
-    # 1. Rozbalíme data.tar.gz, kde je samotná aplikace
     tar xzvf data.tar.gz && \
-    # 2. Přesuneme binárku do systémové cesty
     cp usr/bin/cyberghostvpn /usr/bin/ && \
-    # 3. Zkopírujeme konfigurační šablony a certifikáty
     mkdir -p /etc/cyberghost /usr/local/share/cyberghost && \
     cp -r usr/local/share/cyberghost/* /usr/local/share/cyberghost/ && \
-    # 4. Nastavení práv
     chmod +x /usr/bin/cyberghostvpn && \
     cd .. && rm -rf cg.zip cyberghostvpn-ubuntu-*
 
